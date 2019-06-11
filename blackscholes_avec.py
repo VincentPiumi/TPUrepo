@@ -13,21 +13,24 @@ def blackscholes(S, K, r, T, v) :
 	p = (-1.0*S*N(-1.0*((tf.log(S/K) + (r + 0.5*v*v)*T) / (v*tf.sqrt(T)))) + K*tf.exp(-1.0*r*T)*N(-1.0*((tf.log(S/K) + (r + 0.5*v*v)*T) / (v*tf.sqrt(T)) - v*tf.sqrt(T))))
 	return p
 
-def timer(tpu_computation, tpu_grpc_url) :
-
-	reps = 10
+def timer(inputs) :
+	reps = 2
 	times = []
 
 	for i in range(reps) :
+		t1 = time()
+		tpu_computation = tpu.rewrite(blackscholes, inputs)
+		tpu_grpc_url = TPUClusterResolver(tpu=[os.environ['TPU_NAME']]).get_master()
+
 		with tf.Session(tpu_grpc_url) as sess:
     			sess.run(tpu.initialize_system())
-			t1 = time()
 			sess.run(tf.global_variables_initializer())
 			sess.run(tpu_computation)
-			t2 = time()
-			print(str(i) + "_ : " + str(t2 - t1))
-			times.append(t2 - t1)
 			sess.run(tpu.shutdown_system())
+
+		t2 = time()
+		print(str(i) + "_ : " + str(t2 - t1))
+		times.append(t2 - t1)
 
 	print(sum(times) / reps)
 
@@ -46,10 +49,7 @@ def run() :
 
 	inputs = [S, K, r, T, v]
 
-	tpu_computation = tpu.rewrite(blackscholes, inputs)
-	tpu_grpc_url = TPUClusterResolver(tpu=[os.environ['TPU_NAME']]).get_master()
-
-	timer(tpu_computation, tpu_grpc_url)
+	timer(inputs)
 	print('Done !')
 
 if __name__ == "__main__" :
